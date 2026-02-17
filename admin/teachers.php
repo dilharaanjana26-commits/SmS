@@ -27,9 +27,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'update') {
         db()->prepare('UPDATE teachers SET name=?,whatsapp=?,nic=?,degree_details=?,subjects_text=?,age_group=? WHERE id=? AND school_id=?')->execute([clean_input($_POST['name']),clean_input($_POST['whatsapp']),clean_input($_POST['nic']),clean_input($_POST['degree_details']),clean_input($_POST['subjects_text']),clean_input($_POST['age_group']),(int)$_POST['id'],$schoolId]);
         flash('success','Teacher updated');
-    } elseif ($action === 'delete') {
-        db()->prepare('UPDATE teachers SET active=0 WHERE id=? AND school_id=?')->execute([(int)$_POST['id'],$schoolId]);
-        flash('warning','Teacher deactivated');
+    } elseif ($action === 'deleteTeacher') {
+        header('Content-Type: application/json');
+        $teacherId = (int)($_POST['id'] ?? 0);
+
+        if ($teacherId <= 0) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Invalid teacher id.']);
+            exit;
+        }
+
+        try {
+            $delete = db()->prepare('DELETE FROM teachers WHERE id = ? AND school_id = ?');
+            $delete->execute([$teacherId, $schoolId]);
+
+            if ($delete->rowCount() < 1) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Teacher not found.']);
+                exit;
+            }
+
+            echo json_encode(['success' => true, 'message' => 'Teacher deleted successfully.', 'id' => $teacherId]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Unable to delete teacher.']);
+        }
+
+        exit;
     }
 }
 if ($editId) {
@@ -54,7 +78,53 @@ include __DIR__ . '/../views/layout/header.php'; include __DIR__ . '/../views/la
 </div>
 <input class="form-control mb-2" placeholder="Search" data-search-target="#teachersTbl">
 <div class="card p-3"><table class="table" id="teachersTbl"><thead><tr><th>Name</th><th>User</th><th>Subjects</th><th>Status</th><th></th></tr></thead><tbody>
-<?php foreach($teachers as $t): ?><tr><td><?=e($t['name'])?></td><td><?=e($t['username'])?></td><td><?=e($t['subjects_text'])?></td><td><span class="badge bg-<?= $t['active']?'success':'secondary' ?>"><?= $t['active']?'active':'inactive' ?></span></td><td>
-<a href="/index.php?route=admin/teachers&edit=<?=$t['id']?>" class="btn btn-sm btn-outline-secondary me-1">Edit</a><form method="post" class="d-inline"><input type="hidden" name="_csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=$t['id']?>"><button class="btn btn-sm btn-outline-danger">Delete</button></form>
+<?php foreach($teachers as $t): ?><tr id="teacher-row-<?=$t['id']?>"><td><?=e($t['name'])?></td><td><?=e($t['username'])?></td><td><?=e($t['subjects_text'])?></td><td><span class="badge bg-<?= $t['active']?'success':'secondary' ?>"><?= $t['active']?'active':'inactive' ?></span></td><td>
+<a href="/index.php?route=admin/teachers&edit=<?=$t['id']?>" class="btn btn-sm btn-outline-secondary me-1">Edit</a><button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTeacher(<?=$t['id']?>, this)">Delete</button>
 </td></tr><?php endforeach; ?></tbody></table></div>
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+<script>
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast align-items-center text-bg-${type === 'success' ? 'success' : 'danger'} border-0`;
+  toast.setAttribute('role', 'alert');
+  toast.setAttribute('aria-live', 'assertive');
+  toast.setAttribute('aria-atomic', 'true');
+  toast.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+  container.appendChild(toast);
+  const bsToast = new bootstrap.Toast(toast, { delay: 2500 });
+  bsToast.show();
+  toast.addEventListener('hidden.bs.toast', () => toast.remove());
+}
+
+async function deleteTeacher(id, button) {
+  if (!confirm('Delete this teacher permanently?')) return;
+  button.disabled = true;
+
+  const payload = new URLSearchParams();
+  payload.append('_csrf', '<?=e(csrf_token())?>');
+  payload.append('action', 'deleteTeacher');
+  payload.append('id', String(id));
+
+  try {
+    const response = await fetch('/index.php?route=admin/teachers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: payload.toString()
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Delete failed.');
+    }
+
+    const row = document.getElementById(`teacher-row-${id}`);
+    if (row) row.remove();
+    showToast(result.message || 'Teacher deleted successfully.', 'success');
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message || 'Unable to delete teacher.', 'error');
+  }
+}
+</script>
 <?php include __DIR__ . '/../views/layout/footer.php'; ?>
