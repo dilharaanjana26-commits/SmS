@@ -14,6 +14,7 @@ $routes = [
     'admin/dashboard' => 'admin/dashboard.php',
     'admin/teachers' => 'admin/teachers.php',
     'admin/students' => 'admin/students.php',
+    'admin/classes' => 'admin/classes.php',
     'admin/timetables' => 'admin/timetables.php',
     'admin/absent' => 'admin/absent.php',
     'admin/relief' => 'admin/relief.php',

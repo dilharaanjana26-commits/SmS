@@ -6,6 +6,7 @@
     <?php if ($role === 'admin'): ?>
       <a class="list-group-item list-group-item-action" href="/index.php?route=admin/teachers"><?= e(t('teachers')) ?></a>
       <a class="list-group-item list-group-item-action" href="/index.php?route=admin/students"><?= e(t('students')) ?></a>
+      <a class="list-group-item list-group-item-action" href="/index.php?route=admin/classes">Classes</a>
       <a class="list-group-item list-group-item-action" href="/index.php?route=admin/timetables"><?= e(t('timetables')) ?></a>
       <a class="list-group-item list-group-item-action" href="/index.php?route=admin/absent">Absent</a>
       <a class="list-group-item list-group-item-action" href="/index.php?route=admin/relief">Relief</a>
