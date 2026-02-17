@@ -26,8 +26,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         db()->prepare('UPDATE students SET name=?,address=?,whatsapp=?,class_id=?,age_group=? WHERE id=? AND school_id=?')->execute([clean_input($_POST['name']),clean_input($_POST['address']),clean_input($_POST['whatsapp']),(int)$_POST['class_id'],clean_input($_POST['age_group']),(int)$_POST['id'],$schoolId]);
         flash('success','Student updated');
     } elseif ($action === 'delete') {
-        db()->prepare('UPDATE students SET active=0 WHERE id=? AND school_id=?')->execute([(int)$_POST['id'],$schoolId]);
-        flash('warning','Student deactivated');
+        $studentId = (int)($_POST['id'] ?? 0);
+        db()->beginTransaction();
+        try {
+            $student = db()->prepare('SELECT user_id FROM students WHERE id=? AND school_id=?');
+            $student->execute([$studentId, $schoolId]);
+            $userId = (int)$student->fetchColumn();
+
+            if ($userId < 1) {
+                db()->rollBack();
+                flash('warning', 'Student not found');
+            } else {
+                db()->prepare('DELETE FROM marks WHERE school_id=? AND student_id=?')->execute([$schoolId, $studentId]);
+                db()->prepare('DELETE FROM students WHERE id=? AND school_id=?')->execute([$studentId, $schoolId]);
+                db()->prepare("DELETE FROM users WHERE id=? AND school_id=? AND role='student'")->execute([$userId, $schoolId]);
+                db()->commit();
+                flash('success', 'Student deleted permanently');
+            }
+        } catch (Throwable $e) {
+            if (db()->inTransaction()) {
+                db()->rollBack();
+            }
+            flash('danger', 'Unable to delete student permanently');
+        }
     }
 }
 $classes = db()->prepare('SELECT id,name FROM classes WHERE school_id=? ORDER BY name'); $classes->execute([$schoolId]); $classes=$classes->fetchAll();
