@@ -1,0 +1,12 @@
+<?php
+require_once __DIR__ . '/../config/db.php'; require_once __DIR__ . '/../middleware/auth.php'; require_once __DIR__ . '/../helpers/security.php';
+require_login('teacher');verify_csrf();$schoolId=current_school_id();$uid=auth_user()['id'];
+$teacherId=(int)db()->prepare('SELECT id FROM teachers WHERE school_id=? AND user_id=?')->execute([$schoolId,$uid]);
+$q=db()->prepare('SELECT id FROM teachers WHERE school_id=? AND user_id=?');$q->execute([$schoolId,$uid]);$teacherId=(int)$q->fetchColumn();
+if($_SERVER['REQUEST_METHOD']==='POST'){db()->prepare('INSERT INTO test_updates (school_id,teacher_id,class_id,title,test_date,details,created_at) VALUES (?,?,?,?,?,?,NOW())')->execute([$schoolId,$teacherId,(int)$_POST['class_id'],clean_input($_POST['title']),$_POST['test_date'],clean_input($_POST['details'])]);flash('success','Test update posted');}
+$classes=db()->prepare("SELECT DISTINCT c.id,c.name FROM timetable_entries te JOIN classes c ON c.id=te.class_id AND c.school_id=te.school_id WHERE te.school_id=? AND te.teacher_id=?");$classes->execute([$schoolId,$teacherId]);
+$rows=db()->prepare('SELECT tu.*,c.name class_name FROM test_updates tu JOIN classes c ON c.id=tu.class_id AND c.school_id=tu.school_id WHERE tu.school_id=? AND tu.teacher_id=? ORDER BY tu.test_date DESC');$rows->execute([$schoolId,$teacherId]);
+include __DIR__ . '/../views/layout/header.php'; include __DIR__ . '/../views/layout/sidebar.php'; include __DIR__ . '/../views/layout/topbar.php'; ?>
+<div class="card p-3 mb-3"><form method="post" class="row g-2"><input type="hidden" name="_csrf" value="<?=e(csrf_token())?>"><div class="col-md-3"><select name="class_id" class="form-select"><?php foreach($classes as $c):?><option value="<?=$c['id']?>"><?=e($c['name'])?></option><?php endforeach;?></select></div><div class="col-md-3"><input name="title" class="form-control" placeholder="Title"></div><div class="col-md-2"><input type="date" name="test_date" class="form-control"></div><div class="col-md-3"><input name="details" class="form-control" placeholder="Details"></div><div class="col-md-1"><button class="btn btn-primary">Add</button></div></form></div>
+<div class="card p-3"><table class="table"><tr><th>Class</th><th>Title</th><th>Date</th></tr><?php foreach($rows as $r):?><tr><td><?=e($r['class_name'])?></td><td><?=e($r['title'])?></td><td><?=e($r['test_date'])?></td></tr><?php endforeach;?></table></div>
+<?php include __DIR__ . '/../views/layout/footer.php'; ?>

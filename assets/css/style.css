@@ -1,0 +1,5 @@
+body{font-size:.95rem}
+#wrapper{min-height:100vh}
+#sidebar-wrapper{width:250px}
+.card{border:0;box-shadow:0 .125rem .5rem rgba(0,0,0,.08)}
+.free-period{background:#e7f7ff}
