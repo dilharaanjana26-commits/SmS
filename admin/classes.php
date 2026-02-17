@@ -9,6 +9,19 @@ $schoolId = current_school_id();
 $grades = range(1, 13);
 $letters = range('A', 'K');
 
+function section_for_grade(int $grade): string
+{
+    if ($grade >= 1 && $grade <= 5) {
+        return 'primary';
+    }
+
+    if ($grade >= 6 && $grade <= 11) {
+        return 'secondary';
+    }
+
+    return 'A Level';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -27,15 +40,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($exists->fetchColumn()) {
                 flash('warning', 'Class already exists.');
             } else {
-                db()->prepare("INSERT INTO classes (school_id, name, year, section) VALUES (?, ?, YEAR(CURDATE()), 'secondary')")
-                    ->execute([$schoolId, $className]);
+                $section = section_for_grade($grade);
+                db()->prepare('INSERT INTO classes (school_id, name, year, section) VALUES (?, ?, YEAR(CURDATE()), ?)')
+                    ->execute([$schoolId, $className, $section]);
                 flash('success', 'Class added successfully.');
             }
         }
     }
 }
 
-$classes = db()->prepare('SELECT id,name,year,section FROM classes WHERE school_id=? ORDER BY name');
+$syncSections = db()->prepare(
+    "UPDATE classes
+     SET section = CASE
+         WHEN CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED) BETWEEN 1 AND 5 THEN 'primary'
+         WHEN CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED) BETWEEN 6 AND 11 THEN 'secondary'
+         WHEN CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED) BETWEEN 12 AND 13 THEN 'A Level'
+         ELSE section
+     END
+     WHERE school_id = ?"
+);
+$syncSections->execute([$schoolId]);
+
+$classes = db()->prepare('SELECT id,name,year,section FROM classes WHERE school_id=? ORDER BY CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED), SUBSTRING_INDEX(name, '-', -1)');
 $classes->execute([$schoolId]);
 $classes = $classes->fetchAll();
 
