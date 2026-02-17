@@ -19,7 +19,7 @@ function section_for_grade(int $grade): string
         return 'secondary';
     }
 
-    return 'A Level';
+    return 'al';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -54,7 +54,7 @@ $syncSections = db()->prepare(
      SET section = CASE
          WHEN CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED) BETWEEN 1 AND 5 THEN 'primary'
          WHEN CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED) BETWEEN 6 AND 11 THEN 'secondary'
-         WHEN CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED) BETWEEN 12 AND 13 THEN 'A Level'
+         WHEN CAST(SUBSTRING_INDEX(name, '-', 1) AS UNSIGNED) BETWEEN 12 AND 13 THEN 'al'
          ELSE section
      END
      WHERE school_id = ?"

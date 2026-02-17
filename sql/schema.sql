@@ -175,6 +175,21 @@ CREATE TABLE leave_requests (
   FOREIGN KEY (school_id) REFERENCES schools(id)
 );
 
+
+-- Migration (legacy compatibility): normalize old `A Level` values to `al`.
+-- Run this block when upgrading an existing database.
+ALTER TABLE classes MODIFY section ENUM('primary','secondary','A Level','al') DEFAULT 'secondary';
+UPDATE classes SET section='al' WHERE section='A Level';
+ALTER TABLE classes MODIFY section ENUM('primary','secondary','al') DEFAULT 'secondary';
+
+ALTER TABLE teachers MODIFY age_group ENUM('primary','secondary','A Level','al') DEFAULT 'secondary';
+UPDATE teachers SET age_group='al' WHERE age_group='A Level';
+ALTER TABLE teachers MODIFY age_group ENUM('primary','secondary','al') DEFAULT 'secondary';
+
+ALTER TABLE students MODIFY age_group ENUM('primary','secondary','A Level','al') DEFAULT 'secondary';
+UPDATE students SET age_group='al' WHERE age_group='A Level';
+ALTER TABLE students MODIFY age_group ENUM('primary','secondary','al') DEFAULT 'secondary';
+
 INSERT INTO schools (id,name,address,phone,status) VALUES (1,'Demo Sri Lankan School','Colombo','0771234567','active');
 INSERT INTO users (school_id,role,username,password_hash,language,status) VALUES (1,'admin','admin1','$2y$10$43OTRkQWnY4hu9OYlDApEu5RgrE.3Nj3SIsJm9zq8abA/E1m8fP5q','en','active');
 INSERT INTO classes (school_id,name,year,section) VALUES (1,'7C',2026,'secondary'),(1,'6A',2026,'primary');
