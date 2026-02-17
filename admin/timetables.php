@@ -39,8 +39,23 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 }
 $type = $_GET['type'] ?? 'class';
 $ownerId = (int)($_GET['owner_id'] ?? 0);
-$entries = db()->prepare('SELECT * FROM timetable_entries WHERE school_id=? AND timetable_type=? AND owner_id=?'); $entries->execute([$schoolId,$type,$ownerId]);
-$map=[]; foreach($entries as $e){$map[$e['day_of_week']][$e['period_no']]=$e;}
+
+if ($type === 'teacher') {
+    $entries = db()->prepare('SELECT te.*, c.name AS class_label FROM timetable_entries te LEFT JOIN classes c ON c.id = te.class_id AND c.school_id = te.school_id WHERE te.school_id=? AND te.timetable_type=? AND te.owner_id=? ORDER BY te.day_of_week, te.period_no, te.id');
+    $entries->execute([$schoolId,$type,$ownerId]);
+    $map=[];
+    foreach($entries as $e){
+        $map[$e['day_of_week']][$e['period_no']][]=$e;
+    }
+} else {
+    $entries = db()->prepare('SELECT * FROM timetable_entries WHERE school_id=? AND timetable_type=? AND owner_id=?');
+    $entries->execute([$schoolId,$type,$ownerId]);
+    $map=[];
+    foreach($entries as $e){
+        $map[$e['day_of_week']][$e['period_no']]=$e;
+    }
+}
+
 $classes=db()->prepare('SELECT id,name FROM classes WHERE school_id=?');$classes->execute([$schoolId]);$classes=$classes->fetchAll();
 $teachers=db()->prepare('SELECT id,name,age_group,subjects_text FROM teachers WHERE school_id=? AND active=1');$teachers->execute([$schoolId]);$teachers=$teachers->fetchAll();
 include __DIR__ . '/../views/layout/header.php'; include __DIR__ . '/../views/layout/sidebar.php'; include __DIR__ . '/../views/layout/topbar.php';
@@ -52,8 +67,30 @@ $days=['Mon','Tue','Wed','Thu','Fri'];
 <div class="col-md-2"><button class="btn btn-primary">Load Grid</button></div></form></div>
 <div class="card p-3 mb-3"><h6>Special Day First Period Start</h6><form method="post" class="row g-2"><input type="hidden" name="_csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="special_time"><div class="col-md-3"><input type="time" class="form-control" name="first_period_start" value="07:45"></div><div class="col-md-2"><button class="btn btn-warning">Recalculate</button></div></form></div>
 <div class="card p-3"><table class="table table-bordered"><thead><tr><th>Day/Period</th><?php for($p=1;$p<=8;$p++):?><th>P<?=$p?></th><?php endfor;?></tr></thead><tbody>
-<?php foreach($days as $d): ?><tr><th><?=$d?></th><?php for($p=1;$p<=8;$p++): $cell=$map[$d][$p]??null; ?><td class="<?= $type==='teacher' && empty($cell)?'free-period':'' ?>">
-<small><?= $cell?e($cell['subject']):'Free' ?></small>
+<?php foreach($days as $d): ?><tr><th><?=$d?></th><?php for($p=1;$p<=8;$p++): ?>
+<?php
+$cellEntries = $type==='teacher' ? ($map[$d][$p] ?? []) : [];
+$cell = $type==='teacher' ? ($cellEntries[0] ?? null) : ($map[$d][$p] ?? null);
+$classLabels = [];
+if ($type==='teacher' && !empty($cellEntries)) {
+    foreach ($cellEntries as $entry) {
+        if (!empty($entry['class_label'])) {
+            $classLabels[] = $entry['class_label'];
+        }
+    }
+    $classLabels = array_values(array_unique($classLabels));
+}
+?>
+<td class="<?= $type==='teacher' && empty($cellEntries)?'free-period':'' ?>">
+<?php if($type==='teacher'): ?>
+    <?php if(!empty($classLabels)): ?>
+        <div class="d-flex flex-wrap gap-1"><?php foreach($classLabels as $label): ?><span class="badge bg-primary"><?=e($label)?></span><?php endforeach; ?></div>
+    <?php else: ?>
+        <small>Free</small>
+    <?php endif; ?>
+<?php else: ?>
+    <small><?= $cell?e($cell['subject']):'Free' ?></small>
+<?php endif; ?>
 <form method="post" class="mt-1"><input type="hidden" name="_csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="save_entry"><input type="hidden" name="timetable_type" value="<?=$type?>"><input type="hidden" name="owner_id" value="<?=$ownerId?>"><input type="hidden" name="day_of_week" value="<?=$d?>"><input type="hidden" name="period_no" value="<?=$p?>">
 <select name="class_id" class="form-select form-select-sm mb-1"><?php foreach($classes as $c):?><option value="<?=$c['id']?>" <?=($cell['class_id']??0)==$c['id']?'selected':''?>><?=e($c['name'])?></option><?php endforeach;?></select>
 <select name="teacher_id" class="form-select form-select-sm mb-1"><?php foreach($teachers as $t):?><option value="<?=$t['id']?>" <?=($cell['teacher_id']??0)==$t['id']?'selected':''?>><?=e($t['name'])?></option><?php endforeach;?></select>
